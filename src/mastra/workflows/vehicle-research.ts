@@ -47,6 +47,28 @@ const ResearchOutput = LookupOutput.extend({
   /** Where the claims came from. Empty when the answer was already cached. */
   sources: z.array(z.string()),
   grounded: z.boolean(),
+  /** Null when the research never stated one. Never estimated. */
+  avgPriceCad: z.number().nullable(),
+});
+
+/**
+ * Pulls the headline number back out of the prose.
+ *
+ * The old agent got this for free: it called createVehicle directly and the
+ * model filled in avg_price. Grounding took that away — the model cannot search
+ * and call a typed tool in the same request — so the number is recovered in a
+ * second pass over the text it already produced.
+ *
+ * Reading rather than researching is the point. This pass has no search and is
+ * told to return null rather than estimate, so it can only report a figure the
+ * grounded text actually stated.
+ */
+const PriceExtraction = z.object({
+  avgPriceCad: z
+    .number()
+    .positive()
+    .nullable()
+    .describe("Average used asking price in CAD stated in the text, or null if none is stated"),
 });
 
 const ResearchStep = createStep({
@@ -56,7 +78,7 @@ const ResearchStep = createStep({
   execute: async ({ inputData }) => {
     // Cache hit: nothing to research, and no model call at all.
     if (inputData.cached) {
-      return { ...inputData, research: null, sources: [], grounded: false };
+      return { ...inputData, research: null, sources: [], grounded: false, avgPriceCad: null };
     }
 
     const { year, make, model } = inputData;
@@ -82,16 +104,37 @@ const ResearchStep = createStep({
       | undefined;
     const chunks = metadata?.google?.groundingMetadata?.groundingChunks ?? [];
 
+    const grounded = chunks.length > 0;
+
+    // Only worth reading a price out of text that was actually grounded.
+    let avgPriceCad: number | null = null;
+    if (grounded && result.text) {
+      try {
+        const extracted = await researchAgent.generate(
+          `Read the vehicle research below and report the average used asking ` +
+            `price in Canadian dollars as a single number. If the text does not ` +
+            `state a price, return null. Do not estimate and do not search.\n\n${result.text}`,
+          { structuredOutput: { schema: PriceExtraction } },
+        );
+        avgPriceCad = extracted.object?.avgPriceCad ?? null;
+      } catch {
+        // A missing price is survivable; a wrong one is not. The research text
+        // still carries the figure for a human to read.
+        avgPriceCad = null;
+      }
+    }
+
     return {
       ...inputData,
       research: result.text,
+      avgPriceCad,
       sources: chunks
         .map((c) => c.web?.uri)
         .filter((u): u is string => typeof u === "string"),
       // The check that matters. Ungrounded, this model answers from training
       // data in convincing prose with no citations — which for research is
       // worse than failing, because it reads as fact.
-      grounded: chunks.length > 0,
+      grounded,
     };
   },
 });
@@ -106,6 +149,7 @@ const PersistStep = createStep({
     fromCache: z.boolean(),
     grounded: z.boolean(),
     research: z.string().nullable(),
+    avgPriceCad: z.number().nullable(),
     sources: z.array(z.string()),
     stored: z.boolean(),
     error: z.string().nullable(),
@@ -120,11 +164,16 @@ const PersistStep = createStep({
     };
 
     if (inputData.cached) {
-      const cached = inputData.cached as { description?: string | null };
+      const cached = inputData.cached as {
+        description?: string | null;
+        avg_price?: number | null;
+      };
       return {
         ...base,
         fromCache: true,
         research: cached.description ?? null,
+        // A stored 0 means "never extracted", not "free".
+        avgPriceCad: cached.avg_price ? cached.avg_price : null,
         stored: false,
         error: null,
       };
@@ -140,19 +189,38 @@ const PersistStep = createStep({
         ...base,
         fromCache: false,
         research: inputData.research,
+        avgPriceCad: inputData.avgPriceCad,
         stored: false,
         error: "not stored: the answer was not grounded in search results",
       };
     }
 
-    // avg_price is required by the table and is not reliably extractable from
-    // prose, so the description carries the research and the price stays 0
-    // until something parses it out. A wrong number would be worse than none.
+    /*
+     * `vehicles.avg_price` is NOT NULL, so research that found no price has
+     * nowhere to go. Skipped deliberately rather than attempted and rejected —
+     * and never written as 0, which would read as free rather than as unknown
+     * and would then be served from cache forever.
+     *
+     * The cost is re-searching those vehicles. Making the column nullable would
+     * let "we looked, and there is no Canadian pricing for a 1991 Yugo Cabrio"
+     * be a cacheable answer, which it should be.
+     */
+    if (inputData.avgPriceCad === null) {
+      return {
+        ...base,
+        fromCache: false,
+        research: inputData.research,
+        avgPriceCad: null,
+        stored: false,
+        error: "not cached: the research stated no price, and avg_price is NOT NULL",
+      };
+    }
+
     const saved = await saveVehicle({
       year: inputData.year,
       make: inputData.make,
       model: inputData.model,
-      avg_price: 0,
+      avg_price: inputData.avgPriceCad,
       description: inputData.research,
     });
 
@@ -160,6 +228,7 @@ const PersistStep = createStep({
       ...base,
       fromCache: false,
       research: inputData.research,
+      avgPriceCad: inputData.avgPriceCad,
       stored: saved.created,
       error: saved.error,
     };

@@ -45,7 +45,8 @@ export interface SaveVehicleInput {
   year: number;
   make: string;
   model: string;
-  avg_price: number;
+  /** Null when research never stated one — 0 would read as free. */
+  avg_price: number | null;
   description: string;
 }
 
