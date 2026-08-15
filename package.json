@@ -12,7 +12,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "engines": {
-    "node": ">=22.13.0"
+    "node": "22.x"
   },
   "dependencies": {
     "@mastra/brightdata": "^0.3.0",
