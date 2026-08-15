@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Middleware } from '@mastra/core/server';
+import { isDeployed } from '../runtime';
 
 /**
  * Vercel's Deployment Protection only covers preview deployments on the Hobby
@@ -21,13 +22,8 @@ const matches = (candidate: string, expected: string) =>
     createHash('sha256').update(expected).digest(),
   );
 
-/**
- * Enforce on deployments only. Vercel sets VERCEL on every deployment, so local
- * `mastra dev` and Studio keep working without a token — a browser cannot
- * attach a custom header, so enforcing locally would lock you out of Studio.
- */
-const isDeployed = () => Boolean(process.env.VERCEL) || process.env.NODE_ENV === 'production';
-
+// Enforced on deployments only: a browser cannot attach a custom header, so
+// enforcing locally would lock you out of Studio.
 export const apiKeyAuth: Middleware = {
   path: '*',
   handler: async (c, next) => {

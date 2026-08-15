@@ -13,6 +13,7 @@ import { researchAgent } from './agents/research-agent';
 import { insertAgent } from './agents/insert-agent';
 import { PostgresStore } from '@mastra/pg';
 import { apiKeyAuth } from './server/auth';
+import { isDeployed } from './runtime';
 const storage = new PostgresStore({
   id: 'pg-storage',
   connectionString: process.env.SUPBASE_POSTGRES!,
@@ -25,7 +26,10 @@ export const mastra = new Mastra({
   storage,
   server: { middleware: [apiKeyAuth] },
   agents: { queryAgent,  researchAgent, insertAgent},
-  editor: new MastraEditor({ source: 'code', codePath: 'mastra/editor' }),
+  // The code-backed editor writes agent overrides to disk under codePath. That
+  // works locally, but a deployment's filesystem is read-only outside /tmp, so
+  // registering it there fails every request with ENOENT on mkdir.
+  ...(isDeployed() ? {} : { editor: new MastraEditor({ source: 'code', codePath: 'mastra/editor' }) }),
   logger: new PinoLogger({ name: 'Mastra', level: 'info' }),
   observability: new Observability({
     configs: {
