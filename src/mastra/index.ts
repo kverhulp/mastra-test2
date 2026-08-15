@@ -13,14 +13,15 @@ import { researchAgent } from './agents/research-agent';
 import { insertAgent } from './agents/insert-agent';
 import { PostgresStore } from '@mastra/pg';
 const storage = new PostgresStore({
+  id: 'pg-storage',
   connectionString: process.env.SUPBASE_POSTGRES!,
   schemaName: 'mastra_memory',
-  disableInit: false, 
+  disableInit: false,
 });
 
 export const mastra = new Mastra({
   deployer: new VercelDeployer(),
-  
+  storage,
   agents: { queryAgent,  researchAgent, insertAgent},
   editor: new MastraEditor({ source: 'code', codePath: 'mastra/editor' }),
   logger: new PinoLogger({ name: 'Mastra', level: 'info' }),
