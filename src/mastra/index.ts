@@ -12,6 +12,7 @@ import { queryAgent } from './agents/query-agent';
 import { researchAgent } from './agents/research-agent';
 import { insertAgent } from './agents/insert-agent';
 import { PostgresStore } from '@mastra/pg';
+import { apiKeyAuth } from './server/auth';
 const storage = new PostgresStore({
   id: 'pg-storage',
   connectionString: process.env.SUPBASE_POSTGRES!,
@@ -22,6 +23,7 @@ const storage = new PostgresStore({
 export const mastra = new Mastra({
   deployer: new VercelDeployer(),
   storage,
+  server: { middleware: [apiKeyAuth] },
   agents: { queryAgent,  researchAgent, insertAgent},
   editor: new MastraEditor({ source: 'code', codePath: 'mastra/editor' }),
   logger: new PinoLogger({ name: 'Mastra', level: 'info' }),
