@@ -33,6 +33,10 @@ export const insertAgent = new Agent({
 
   model: "google/gemini-3.5-flash-lite",
 
+  // Insert, then delegate to researchAgent and relay its findings — more than
+  // the default 5-step cap allows.
+  defaultOptions: { maxSteps: 15 },
+
   tools: {
     insertListing
   },

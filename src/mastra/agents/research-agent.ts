@@ -39,6 +39,11 @@ export const researchAgent = new Agent({
 
   model: "google/gemini-3.5-flash-lite",
 
+  // The research loop is getVehicle -> webSearch (often several) -> webFetch ->
+  // createVehicle -> summarise. Mastra's default step cap of 5 truncates that
+  // mid-loop, so the agent returns no text and never records the vehicle.
+  defaultOptions: { maxSteps: 15 },
+
   tools: {
     createVehicle, getVehicle, webFetch, webSearch
   },
