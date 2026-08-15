@@ -64,12 +64,38 @@ const ResearchOutput = LookupOutput.extend({
  * grounded text actually stated.
  */
 const PriceExtraction = z.object({
-  avgPriceCad: z
+  averageCad: z
     .number()
     .positive()
     .nullable()
-    .describe("Average used asking price in CAD stated in the text, or null if none is stated"),
+    .describe("A single average price in CAD if the text states one, else null"),
+  lowCad: z
+    .number()
+    .positive()
+    .nullable()
+    .describe("Bottom of the price range in CAD if the text gives a range, else null"),
+  highCad: z
+    .number()
+    .positive()
+    .nullable()
+    .describe("Top of the price range in CAD if the text gives a range, else null"),
 });
+
+/**
+ * Research usually states a range — "typically $4,000 to $7,000 CAD" — rather
+ * than a single figure. Asking only for an average made the extractor correctly
+ * answer null on the common case, so almost nothing reached the cache.
+ *
+ * The midpoint is computed here rather than asked for: deriving it is
+ * arithmetic, and arithmetic is not something to pay a model to do or to trust
+ * it with.
+ */
+function priceFrom(extracted: z.infer<typeof PriceExtraction>): number | null {
+  if (extracted.averageCad !== null) return Math.round(extracted.averageCad);
+  const { lowCad, highCad } = extracted;
+  if (lowCad !== null && highCad !== null) return Math.round((lowCad + highCad) / 2);
+  return lowCad ?? highCad ?? null;
+}
 
 const ResearchStep = createStep({
   id: "research",
@@ -111,12 +137,14 @@ const ResearchStep = createStep({
     if (grounded && result.text) {
       try {
         const extracted = await researchAgent.generate(
-          `Read the vehicle research below and report the average used asking ` +
-            `price in Canadian dollars as a single number. If the text does not ` +
-            `state a price, return null. Do not estimate and do not search.\n\n${result.text}`,
+          `Read the vehicle research below and report the used asking price in ` +
+            `Canadian dollars. If it states a single average, put it in ` +
+            `averageCad. If it states a range, put the ends in lowCad and ` +
+            `highCad. Use null for anything the text does not state. Do not ` +
+            `estimate and do not search.\n\n${result.text}`,
           { structuredOutput: { schema: PriceExtraction } },
         );
-        avgPriceCad = extracted.object?.avgPriceCad ?? null;
+        avgPriceCad = extracted.object ? priceFrom(extracted.object) : null;
       } catch {
         // A missing price is survivable; a wrong one is not. The research text
         // still carries the figure for a human to read.
