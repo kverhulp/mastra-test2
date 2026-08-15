@@ -1,6 +1,4 @@
 import { Agent } from "@mastra/core/agent";
-import { getVehicle } from "../tools/get-vehicle";
-import { createVehicle } from "../tools/create-vehicle";
 
 import { Memory } from "@mastra/memory";
 
@@ -46,8 +44,6 @@ export const researchAgent = new Agent({
   defaultOptions: { maxSteps: 10 },
 
   tools: {
-    createVehicle,
-    getVehicle,
 
     /*
      * Google's own search grounding, executed by the provider rather than by us.
