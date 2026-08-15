@@ -1,5 +1,0 @@
-compatibility_flags = [ "nodejs_compat" ]
-compatibility_date = "2024-09-23"
-
-[build]
-command = "npx esbuild src/index.js --bundle --conditions=node --platform=node"

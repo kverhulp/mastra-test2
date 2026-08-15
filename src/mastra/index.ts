@@ -1,5 +1,5 @@
 import { Mastra } from '@mastra/core/mastra';
-import { CloudflareDeployer } from '@mastra/deployer-cloudflare';
+import { VercelDeployer } from '@mastra/deployer-vercel';
 import { MastraEditor } from '@mastra/editor';
 import { PinoLogger } from '@mastra/loggers';
 import {
@@ -19,7 +19,7 @@ const storage = new PostgresStore({
 });
 
 export const mastra = new Mastra({
-  deployer: new CloudflareDeployer({ name: 'your-project-name' }),
+  deployer: new VercelDeployer(),
   
   agents: { queryAgent,  researchAgent, insertAgent},
   editor: new MastraEditor({ source: 'code', codePath: 'mastra/editor' }),

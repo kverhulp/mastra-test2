@@ -1,8 +1,7 @@
 {
-  "name": "template-docs-expert",
+  "name": "listingagent",
   "version": "1.0.0",
-  "description": "A research assistant that answers questions with web-sourced citations using a Mastra web search tool routed through Mastra's Gateway. Stores observability and observational memory in Turso (libSQL).",
-  "main": "index.js",
+  "description": "Mastra agents for querying, inserting, and researching vehicle listings backed by Supabase.",
   "scripts": {
     "dev": "mastra dev",
     "build": "mastra build",
@@ -16,22 +15,16 @@
     "node": ">=22.13.0"
   },
   "dependencies": {
-    "@google/genai": "latest",
     "@mastra/brightdata": "^0.3.0",
     "@mastra/core": "latest",
-    "@mastra/deployer-cloudflare": "latest",
+    "@mastra/deployer-vercel": "^1.2.16",
     "@mastra/editor": "latest",
-    "@mastra/libsql": "latest",
     "@mastra/loggers": "latest",
     "@mastra/memory": "latest",
     "@mastra/observability": "latest",
     "@mastra/pg": "latest",
     "@supabase/supabase-js": "latest",
     "zod": "^4.3.6"
-  },
-  "resolutions": {
-    "npm-run-path": "^5.1.0",
-    "unicorn-magic": "^0.4.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.9",
